@@ -70,6 +70,9 @@ Air pollution poses significant threats to human health, particularly affecting 
 * Temperature vs Humidity dual-axis visualization.
 * Summary table of pollutant levels for initial days.
 * Feature importance: Temperature and humidity heavily influence CO and C6H6.
+![Image](https://github.com/user-attachments/assets/d9472b85-8003-4a1f-a51c-9329e7c9800d)
+![Image](https://github.com/user-attachments/assets/5d71ccb1-2eec-4919-8922-11739f5cbfd1)
+![Image](https://github.com/user-attachments/assets/c38156f8-1b58-40f3-971e-6ca4c16a1dc2)
   
 
 ## 🧰 Tools & Technologies
