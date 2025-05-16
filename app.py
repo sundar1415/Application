@@ -1,76 +1,59 @@
+# app.py
+
 import streamlit as st
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-import numpy as np
 
+# Set Streamlit page config
 st.set_page_config(page_title="Air Quality Dashboard", layout="wide")
 st.title("🌍 Air Quality Analysis Dashboard")
 
+# Load dataset
 @st.cache_data
 def load_data():
-    try:
-        df = pd.read_csv("cleaned_air_quality.csv")
+    df = pd.read_csv("cleaned_air_quality.csv")
 
-        # Combine Date and Time
-        df['DateTime'] = pd.to_datetime(df['Date'] + ' ' + df['Time'], format='%d/%m/%Y %H.%M.%S', errors='coerce')
-        df = df.dropna(subset=['DateTime'])
+    # Combine Date and Time into DateTime column
+    df['DateTime'] = pd.to_datetime(df['Date'] + ' ' + df['Time'], format='%d/%m/%Y %H.%M.%S', errors='coerce')
+    df = df.dropna(subset=['DateTime'])
 
-        # Replace -200 with NaN for pollutants
-        pollutants = ['CO(GT)', 'C6H6(GT)', 'NOx(GT)', 'NO2(GT)']
-        df[pollutants] = df[pollutants].replace(-200, np.nan)
-        df = df.dropna(subset=pollutants + ['T', 'RH'])
+    # Replace -200 with NaN for air pollutant columns
+    pollutants = ['CO(GT)', 'C6H6(GT)', 'NOx(GT)', 'NO2(GT)']
+    df[pollutants] = df[pollutants].replace(-200, np.nan)
 
-        # Rename for clarity
-        df = df[['DateTime', 'CO(GT)', 'C6H6(GT)', 'NOx(GT)', 'NO2(GT)', 'T', 'RH']]
-        df.columns = ['DateTime', 'CO', 'C6H6', 'NOx', 'NO2', 'Temperature', 'Humidity']
+    # Drop rows with missing critical values
+    df.dropna(subset=pollutants + ['T', 'RH'], inplace=True)
 
-        return df
-    except Exception as e:
-        st.error(f"❌ Error loading the dataset: {e}")
-        return pd.DataFrame()
+    return df
 
-# Load the cleaned dataset
 df = load_data()
 
-if not df.empty:
-    st.success("✅ Data loaded successfully!")
+# Sidebar filters
+st.sidebar.header("📊 Filters")
+start_date = st.sidebar.date_input("From Date", df['DateTime'].min().date())
+end_date = st.sidebar.date_input("To Date", df['DateTime'].max().date())
 
-    # Daily aggregation
-    daily_df = df.groupby(df['DateTime'].dt.date).mean(numeric_only=True).reset_index()
-    daily_df['DateTime'] = pd.to_datetime(daily_df['DateTime'])
+filtered_df = df[(df['DateTime'].dt.date >= start_date) & (df['DateTime'].dt.date <= end_date)]
 
-    # CO and Benzene
-    st.subheader("📊 CO and C6H6 over Time")
-    fig1, ax1 = plt.subplots(figsize=(12, 5))
-    ax1.plot(daily_df['DateTime'], daily_df['CO'], label='CO (mg/m³)', color='blue')
-    ax1.set_ylabel('CO', color='blue')
-    ax2 = ax1.twinx()
-    ax2.plot(daily_df['DateTime'], daily_df['C6H6'], label='C6H6 (µg/m³)', color='green')
-    ax2.set_ylabel('C6H6', color='green')
-    ax1.set_xlabel("Date")
-    ax1.set_title("CO and Benzene (C6H6) Levels")
-    st.pyplot(fig1)
+# Line plot for pollutant levels
+st.subheader("📈 Air Pollutants Over Time")
+selected_pollutants = st.multiselect("Choose pollutants to visualize", ['CO(GT)', 'C6H6(GT)', 'NOx(GT)', 'NO2(GT)'], default=['CO(GT)'])
 
-    # NOx vs NO2
-    st.subheader("📈 NOx vs NO2 Scatter")
-    fig2, ax = plt.subplots(figsize=(6, 5))
-    sns.scatterplot(data=df, x='NOx', y='NO2', ax=ax, alpha=0.6)
-    ax.set_title("NOx vs NO2")
-    st.pyplot(fig2)
+if selected_pollutants:
+    for pollutant in selected_pollutants:
+        st.line_chart(filtered_df.set_index('DateTime')[pollutant])
 
-    # Temperature and Humidity
-    st.subheader("🌡️ Daily Temperature and Humidity")
-    fig3, ax1 = plt.subplots(figsize=(12, 5))
-    ax1.plot(daily_df['DateTime'], daily_df['Temperature'], color='orange', label='Temperature')
-    ax2 = ax1.twinx()
-    ax2.plot(daily_df['DateTime'], daily_df['Humidity'], color='purple', label='Humidity')
-    ax1.set_title("Temperature & Humidity Over Time")
-    st.pyplot(fig3)
+# Correlation heatmap
+st.subheader("📌 Correlation Between Variables")
+numeric_cols = ['CO(GT)', 'C6H6(GT)', 'NOx(GT)', 'NO2(GT)', 'T', 'RH']
+corr = filtered_df[numeric_cols].corr()
 
-    # Data preview
-    st.subheader("🧾 First Few Rows of Data")
-    st.dataframe(df.head())
+fig, ax = plt.subplots()
+sns.heatmap(corr, annot=True, cmap="coolwarm", ax=ax)
+st.pyplot(fig)
 
-else:
-    st.warning("⚠️ Please make sure 'cleaned_air_quality.csv' is present in the working directory.")
+# Raw data preview
+st.subheader("📄 Raw Data Preview")
+st.dataframe(filtered_df.head())
